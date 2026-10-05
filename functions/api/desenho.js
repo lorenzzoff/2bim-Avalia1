@@ -1,12 +1,13 @@
 import { gerarDesenho, numeroValido } from "../../lib/desenho.js";
 
 export async function onRequest(context) {
-
   if (context.request.method !== "POST") {
     return new Response("Método não permitido", {
       status: 405,
     });
   }
+
+}
 
   try {
     let corpo;
