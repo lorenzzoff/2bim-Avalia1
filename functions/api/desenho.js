@@ -1,13 +1,20 @@
 import { gerarDesenho, numeroValido } from "../../lib/desenho.js";
 
-export async function onRequestPost(context) {
+export async function onRequest(context) {
+
+  if (context.request.method !== "POST") {
+    return new Response("Método não permitido", {
+      status: 405,
+    });
+  }
+
   try {
     let corpo;
 
     try {
       corpo = await context.request.json();
     } catch {
-      return new Response("JSON inválido", {
+      return new Response(null, {
         status: 400,
       });
     }
@@ -15,7 +22,7 @@ export async function onRequestPost(context) {
     const numero = Number(corpo.numero);
 
     if (!numeroValido(numero)) {
-      return new Response("Número inválido", {
+      return new Response(null, {
         status: 400,
       });
     }
@@ -24,7 +31,7 @@ export async function onRequestPost(context) {
       context.request.headers.get("Authorization");
 
     if (!authorization?.startsWith("Bearer ")) {
-      return new Response("Token ausente", {
+      return new Response(null, {
         status: 401,
       });
     }
@@ -37,7 +44,7 @@ export async function onRequestPost(context) {
     );
 
     if (!respostaGoogle.ok) {
-      return new Response("Token inválido", {
+      return new Response(null, {
         status: 401,
       });
     }
@@ -48,7 +55,7 @@ export async function onRequestPost(context) {
       dados.aud !== context.env.GOOGLE_CLIENT_ID ||
       dados.email_verified !== "true"
     ) {
-      return new Response("Token inválido", {
+      return new Response(null, {
         status: 401,
       });
     }
@@ -64,15 +71,10 @@ export async function onRequestPost(context) {
         "Content-Type": "image/svg+xml; charset=utf-8",
       },
     });
-  } catch (erro) {
+
+  } catch {
     return new Response("Erro interno", {
       status: 500,
     });
   }
-}
-
-export async function onRequest() {
-  return new Response("Método não permitido", {
-    status: 405,
-  });
 }
