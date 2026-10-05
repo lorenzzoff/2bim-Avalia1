@@ -1,46 +1,106 @@
-// script.js
-// Versao inicial: todo o trabalho acontece no navegador.
-// A tarefa consiste em levar gerarDesenho para o servidor (Pages Functions)
-// e fazer esta pagina apenas enviar o numero e exibir a resposta.
+const ID_GOOGLE = "308036544937-p2vnblmnvuo7g30aoau7f6udhjmmao1u.apps.googleusercontent.com";
 
-import { gerarDesenho, numeroValido } from "./desenho.js";
+const form = document.querySelector("#formulario");
+const entrada = document.querySelector("#numero");
+const desenho = document.querySelector("#desenho");
+const aviso = document.querySelector("#mensagem");
+const download = document.querySelector("#baixar");
 
-const formulario = document.getElementById("formulario");
-const campoNumero = document.getElementById("numero");
-const campoEmail = document.getElementById("email");
-const area = document.getElementById("desenho");
-const mensagem = document.getElementById("mensagem");
-const botaoBaixar = document.getElementById("baixar");
+let tokenGoogle = "";
+let conteudoSvg = "";
 
-let svgAtual = "";
+if (window.google) {
+    google.accounts.id.initialize({
+        client_id: ID_GOOGLE,
 
-formulario.addEventListener("submit", (evento) => {
-  evento.preventDefault();
-  mensagem.textContent = "";
+        callback: (resultado) => {
+            tokenGoogle = resultado.credential;
+            aviso.textContent = "Login realizado com sucesso.";
+        }
+    });
 
-  const numero = Number(campoNumero.value);
-  const email = campoEmail.value.trim();
+    google.accounts.id.renderButton(
+        document.querySelector("#g_id_signin"),
+        {
+            theme: "outline",
+            size: "large"
+        }
+    );
+} else {
+    console.error("Biblioteca Google não carregada.");
+}
 
-  if (!numeroValido(numero)) {
-    mensagem.textContent = "Digite um inteiro entre 1 e 100.";
-    return;
-  }
-  if (email === "") {
-    mensagem.textContent = "Informe um e-mail.";
-    return;
-  }
+function mostrarErro(mensagem) {
+    aviso.textContent = mensagem;
+}
 
-  svgAtual = gerarDesenho(numero, email);
-  area.innerHTML = svgAtual;
-  botaoBaixar.hidden = false;
+form?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    aviso.textContent = "";
+    desenho.innerHTML = "";
+
+    const valor = Number(entrada.value);
+
+    const configuracao = {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            numero: valor
+        })
+    };
+
+    if (tokenGoogle) {
+        configuracao.headers.Authorization = `Bearer ${tokenGoogle}`;
+    }
+
+    try {
+        const retorno = await fetch("/api/desenho", configuracao);
+
+        if (retorno.status === 400) {
+            mostrarErro("Número inválido: use um inteiro de 1 a 100.");
+            return;
+        }
+
+        if (retorno.status === 401) {
+            tokenGoogle = "";
+            mostrarErro("Faça login com o Google.");
+            return;
+        }
+
+        if (!retorno.ok) {
+            mostrarErro(`Erro ${retorno.status}`);
+            return;
+        }
+
+        conteudoSvg = await retorno.text();
+
+        desenho.innerHTML = conteudoSvg;
+        download.hidden = false;
+
+    } catch (erro) {
+        console.error(erro);
+        mostrarErro("Falha ao conectar com o servidor.");
+    }
 });
 
-botaoBaixar.addEventListener("click", () => {
-  const arquivo = new Blob([svgAtual], { type: "image/svg+xml" });
-  const url = URL.createObjectURL(arquivo);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "exemplo.svg";
-  link.click();
-  URL.revokeObjectURL(url);
+download?.addEventListener("click", () => {
+    const blob = new Blob(
+        [conteudoSvg],
+        { type: "image/svg+xml" }
+    );
+
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "desenho.svg";
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(url);
 });
